@@ -749,7 +749,8 @@
     };
 
     var charCode = input.charCodeAt(index)
-      , next = input.charCodeAt(index + 1);
+      , next = input.charCodeAt(index + 1)
+      , secondNext = input.charCodeAt(index + 2);
 
     // Memorize the range index where the token begins.
     tokenStart = index;
@@ -778,13 +779,21 @@
 
       case 62: // >
         if (features.bitwiseOperators)
-          if (62 === next) return scanPunctuator('>>');
+          if (62 === next) {
+            if (features.compoundOperators)
+              if (61 === secondNext) return scanPunctuator('>>=');
+            return scanPunctuator('>>');
+          }
         if (61 === next) return scanPunctuator('>=');
         return scanPunctuator('>');
 
       case 60: // <
         if (features.bitwiseOperators)
-          if (60 === next) return scanPunctuator('<<');
+          if (60 === next) {
+            if (features.compoundOperators)
+              if (61 === secondNext) return scanPunctuator('<<=');
+            return scanPunctuator('<<');
+          }
         if (61 === next) return scanPunctuator('<=');
         return scanPunctuator('<');
 
@@ -808,16 +817,25 @@
         // Check for integer division op (//)
         if (features.integerDivision)
           if (47 === next) return scanPunctuator('//');
+        if (features.compoundOperators)
+          if (61 === next) return scanPunctuator('/=');
         return scanPunctuator('/');
 
       case 38: case 124: // & |
         if (!features.bitwiseOperators)
           break;
+        /* fall through */
+
+      case 43: // +
+      case 45: // -
+      case 42: // *
+      case 94: // ^
+        if (features.compoundOperators)
+          if (61 == next) return scanPunctuator(input.charAt(index) + '=')
 
         /* fall through */
-      case 42: case 94: case 37: case 44: case 123: case 125:
-      case 93: case 40: case 41: case 59: case 35: case 45:
-      case 43: // * ^ % , { } ] ( ) ; # - +
+      case 37: case 44: case 123: case 125:case 93: case 40:
+      case 41: case 59: case 35: // * ^ % , { } ] ( ) ; #
         return scanPunctuator(input.charAt(index));
     }
 
@@ -1397,7 +1415,8 @@
   // Expect the next token value to match. If not, throw an exception.
 
   function expect(value) {
-    if (value === token.value) next();
+    if (!Array.isArray(value)) value = [value];
+    if (value.includes(token.value)) next();
     else raise(token, errors.expected, value, tokenValue(token));
   }
 
@@ -2249,7 +2268,14 @@
       return unexpected(token);
     }
 
-    expect('=');
+    const assignmentOperators = ['=']
+    if (features.compoundOperators) {
+      assignmentOperators.push('+=', '-=', '/=', '^=');
+      if (features.bitwiseOperators) {
+        assignmentOperators.push('<<=', '>>=', '&=', '|=');
+      }
+    }
+    expect(assignmentOperators);
 
     var values = [];
 
@@ -2753,7 +2779,22 @@
       unicodeEscapes: true,
       imaginaryNumbers: true,
       integerSuffixes: true
-    }
+    },
+    'LuaGLM': {
+      labels: true,
+      emptyStatement: true,
+      hexEscapes: true,
+      skipWhitespaceEscape: true,
+      strictEscapes: true,
+      unicodeEscapes: true,
+      bitwiseOperators: true,
+      integerDivision: true,
+      relaxedBreak: true,
+      noLabelShadowing: true,
+      attributes: { 'const': true, 'close': true },
+      relaxedUTF8: true,
+      compoundOperators: true
+    },
   };
 
   function parse(_input, _options) {
