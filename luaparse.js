@@ -831,12 +831,21 @@
       case 42: // *
       case 94: // ^
         if (features.compoundOperators)
-          if (61 == next) return scanPunctuator(input.charAt(index) + '=')
+          if (61 === next) return scanPunctuator(input.charAt(index) + '=')
 
         /* fall through */
       case 37: case 44: case 123: case 125:case 93: case 40:
       case 41: case 59: case 35: // * ^ % , { } ] ( ) ; #
         return scanPunctuator(input.charAt(index));
+      
+      case 63: // ?
+        // Skip ? if it's for safe navigation
+        if (features.safeNavigation)
+          if (46 === next || 91 === next) {
+            index += 1;
+            return lex();
+          }
+        break;
     }
 
     return unexpected(input.charAt(index));
@@ -2793,7 +2802,8 @@
       noLabelShadowing: true,
       attributes: { 'const': true, 'close': true },
       relaxedUTF8: true,
-      compoundOperators: true
+      compoundOperators: true,
+      safeNavigation: true
     },
   };
 
