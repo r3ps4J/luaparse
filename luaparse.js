@@ -760,6 +760,11 @@
       case 39: case 34: // '"
         return scanStringLiteral();
 
+      case 96: // `
+        if (features.compileTimeJenkinsHashes)
+          return scanStringLiteral();
+        break;
+
       case 48: case 49: case 50: case 51: case 52: case 53:
       case 54: case 55: case 56: case 57: // 0-9
         return scanNumericLiteral();
@@ -2803,7 +2808,8 @@
       attributes: { 'const': true, 'close': true },
       relaxedUTF8: true,
       compoundOperators: true,
-      safeNavigation: true
+      safeNavigation: true,
+      compileTimeJenkinsHashes: true
     },
   };
 
