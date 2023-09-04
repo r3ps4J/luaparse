@@ -734,9 +734,21 @@
   function lex() {
     skipWhiteSpace();
 
-    // Skip comments beginning with --
-    while (45 === input.charCodeAt(index) &&
-           45 === input.charCodeAt(index + 1)) {
+    const inComment = () => {
+      // Skip comments beginning with --
+      if (45 === input.charCodeAt(index) && 45 === input.charCodeAt(index + 1)) {
+        return true;
+      } else if (features.cStyleComments) {
+        // Skip comments beginning with /*
+        if (47 === input.charCodeAt(index) && 42 === input.charCodeAt(index + 1)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // Skip comments beginning with -- or /* depending on enabled features
+    while (inComment()) {
       scanComment();
       skipWhiteSpace();
     }
@@ -1315,7 +1327,10 @@
       , lineStartComment = lineStart
       , lineComment = line;
 
-    if ('[' === character) {
+    if (features.cStyleComments && input.charCodeAt(tokenStart) === 47 /* / */ && input.charCodeAt(tokenStart + 1) === 42 /* * */) {
+      content = readCStyleComment();
+      isLong = true;
+    } else if ('[' === character) {
       content = readLongString(true);
       // This wasn't a multiline comment after all.
       if (false === content) content = character;
@@ -1400,6 +1415,36 @@
                 errors.unfinishedLongComment :
                 errors.unfinishedLongString,
           firstLine, '<eof>');
+  }
+
+  function readCStyleComment() {
+    var content = ''
+      , character, nextCharacter
+      , stringStart, firstLine = line;
+
+    index += 2; // /*
+
+    // If the first character is a newline, ignore it and begin on next line.
+    if (isLineTerminator(input.charCodeAt(index))) consumeEOL();
+
+    stringStart = index;
+    while (index < length) {
+      // To keep track of line numbers run the `consumeEOL()` which increments
+      // its counter.
+      while (isLineTerminator(input.charCodeAt(index))) consumeEOL();
+
+      character = input.charAt(index++);
+      nextCharacter = input.charAt(index);
+
+      // We reached the end of the multiline string. Get out now.
+      if ('*' === character && '/' === nextCharacter) {
+        content += input.slice(stringStart, index - 1);
+        index += 1;
+        return content;
+      }
+    }
+
+    raise(null, errors.unfinishedLongComment, firstLine, '<eof>');
   }
 
   // ## Lex functions and helpers.
@@ -2809,7 +2854,8 @@
       relaxedUTF8: true,
       compoundOperators: true,
       safeNavigation: true,
-      compileTimeJenkinsHashes: true
+      compileTimeJenkinsHashes: true,
+      cStyleComments: true
     },
   };
 
